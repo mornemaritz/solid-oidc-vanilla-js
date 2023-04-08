@@ -13,7 +13,7 @@ var config = {
 };
 </script>
 
-<div class="full-height">
+<div class="flex-center full-height">
     <div class="content">
         <a href="#" id="start">Click to Generate JWT</a>
         <div id="token" class="hidden">
@@ -34,7 +34,7 @@ https://coolaj86.com/articles/sign-jwt-webcrypto-vanilla-js/
 https://github.com/aaronpk/pkce-vanilla-js/blob/master/index.html
 */
 
-document.getElementById("start").addEventListener("click", function(e){
+document.getElementById("start").addEventListener("click", async function(e){
     e.preventDefault();
 
     // var claims = {
@@ -53,23 +53,23 @@ document.getElementById("start").addEventListener("click", function(e){
         "iat": Math.round(Date.now() / 1000)
     }
 
-    EC.generate()
-    .then(function(jwk) {
+    await EC.generate()
+    .then(async jwk => {
         console.info('Private Key:', JSON.stringify(jwk));
         console.info('Public Key:', JSON.stringify(EC.neuter(jwk)));
 
-        return JWK.thumbprint(jwk)
-        .then(function(kid) {
+        return await JWK.thumbprint(jwk)
+        .then(async kid => {
             // return JWT.sign(jwk, { kid: kid }, claims)
-            return JWT.sign(jwk, {}, claims)
-            .then(function(jwt) {
+            return await JWT.sign(jwk, {}, claims)
+            .then(jwt => {
                 console.info('JWT:', jwt);
 
                 document.getElementById("access_token").innerText = jwt;
                 document.getElementById("start").classList = "hidden";
                 document.getElementById("token").classList = "";
             })
-            .catch(function(e) {
+            .catch(e => {
                 console.error(e);
 
                 document.getElementById("error_details").innerText = error.error+"\n\n"+error.error_description;
@@ -77,7 +77,7 @@ document.getElementById("start").addEventListener("click", function(e){
 
             });
         })    
-        .catch(function(e) {
+        .catch(e => {
             console.error(e);
 
             document.getElementById("error_details").innerText = error.error+"\n\n"+error.error_description;
@@ -85,7 +85,7 @@ document.getElementById("start").addEventListener("click", function(e){
 
         });    
     })    
-    .catch(function(e) {
+    .catch(e => {
         console.error(e);
 
         document.getElementById("error_details").innerText = error.error+"\n\n"+error.error_description;
@@ -97,7 +97,7 @@ document.getElementById("start").addEventListener("click", function(e){
 
 
 var JWT = {};
-JWT.sign = function(jwk, headers, claims) {
+JWT.sign = async (jwk, headers, claims) => {
     // Make a shallow copy of the key
     // (to set ext if it wasn't already set)
     jwk = Object.assign({}, jwk);
@@ -133,9 +133,9 @@ JWT.sign = function(jwk, headers, claims) {
     var privileges = ['sign'];
 
     // Actually do the import, which comes out as an abstract key type
-    return window.crypto.subtle
+    return await window.crypto.subtle
         .importKey('jwk', jwk, keyType, exportable, privileges)
-        .then(function(privkey) {
+        .then(async privkey => {
             // Convert UTF-8 to Uint8Array ArrayBuffer
             var data = strToUint8(jws.protected + '.' + jws.payload);
 
@@ -143,7 +143,8 @@ JWT.sign = function(jwk, headers, claims) {
             // https://tools.ietf.org/html/rfc7518#section-3
             var sigType = { name: 'ECDSA', hash: { name: 'SHA-256' } };
 
-            return window.crypto.subtle.sign(sigType, privkey, data).then(function(signature) {
+            return await window.crypto.subtle.sign(sigType, privkey, data)
+            .then(signature => {
                 // returns an ArrayBuffer containing a JOSE (not X509) signature,
                 // which must be converted to Uint8 to be useful
                 jws.signature = uint8ToUrlBase64(new Uint8Array(signature));
@@ -155,24 +156,25 @@ JWT.sign = function(jwk, headers, claims) {
 };
 
 var EC = {};
-EC.generate = function() {
+EC.generate = async () => {
     var keyType = {
         name: 'ECDSA',
         namedCurve: 'P-256'
     };
     var exportable = true;
     var privileges = ['sign', 'verify'];
-    return window.crypto.subtle.generateKey(keyType, exportable, privileges).then(function(key) {
+    return await window.crypto.subtle.generateKey(keyType, exportable, privileges)
+    .then(async key => {
         // returns an abstract and opaque WebCrypto object,
         // which in most cases you'll want to export as JSON to be able to save
-        return window.crypto.subtle.exportKey('jwk', key.privateKey);
+        return await window.crypto.subtle.exportKey('jwk', key.privateKey);
     });
 };
 
 // Create a Public Key from a Private Key
 //
 // chops off the private parts
-EC.neuter = function(jwk) {
+EC.neuter = jwk => {
     var copy = Object.assign({}, jwk);
     delete copy.d;
     copy.key_ops = ['verify'];
@@ -180,7 +182,7 @@ EC.neuter = function(jwk) {
 };
 
 var JWK = {};
-JWK.thumbprint = function(jwk) {
+JWK.thumbprint = async jwk => {
     // lexigraphically sorted, no spaces
     var sortedPub = '{"crv":"CRV","kty":"EC","x":"X","y":"Y"}'
         .replace('CRV', jwk.crv)
@@ -189,9 +191,9 @@ JWK.thumbprint = function(jwk) {
 
     // The hash should match the size of the key,
     // but we're only dealing with P-256
-    return window.crypto.subtle
+    return await window.crypto.subtle
         .digest({ name: 'SHA-256' }, strToUint8(sortedPub))
-        .then(function(hash) {
+        .then(hash => {
             return uint8ToUrlBase64(new Uint8Array(hash));
         });
 };
