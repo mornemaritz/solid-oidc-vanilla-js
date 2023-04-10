@@ -305,7 +305,7 @@ function uint8ToUrlBase64(uint8) {
             let claims = {
                 "htu": config.token_endpoint,
                 "htm": "POST",
-                "jti": "4ba3e9ef-e98d-4644-9878-7160fa7d3eb8",
+                "jti": generateRandomString(),
                 "iat": Math.round(Date.now() / 1000)
             }
         
