@@ -319,42 +319,24 @@ function uint8ToUrlBase64(uint8) {
             .then(async jwk => {
                 console.info('Private Key:', JSON.stringify(jwk));
                 console.info('Public Key:', JSON.stringify(EC.neuter(jwk)));
+                const thumbprint = await JWK.thumbprint(jwk);
+
+                return { jwk, thumbprint }
+            })
+            .then(async x => {
+                // return JWT.sign(jwk, { kid: kid }, claims)
+                return await JWT.sign(x.jwk, {}, claims)
+            })
+            .then(singedJwt => {
+                console.info('JWT:', singedJwt);
                 
-                return await JWK.thumbprint(jwk)
-                .then(async kid => {
-                    // return JWT.sign(jwk, { kid: kid }, claims)
-                    return await JWT.sign(jwk, {}, claims)
-                    .then(jwt => {
-                        console.info('JWT:', jwt);
-                        
-                        return jwt;
-                        
-                        document.getElementById("access_token").innerText = jwt;
-                        document.getElementById("start").classList = "hidden";
-                        document.getElementById("token").classList = "";
-                    })
-                    .catch(e => {
-                        console.error(e);
-                        
-                        document.getElementById("error_details").innerText = error.error+"\n\n"+error.error_description;
-                        document.getElementById("error").classList = "";    
-                        
-                    });
-                })    
-                .catch(e => {
-                    console.error(e);
-                    
-                    document.getElementById("error_details").innerText = error.error+"\n\n"+error.error_description;
-                    document.getElementById("error").classList = "";
-                    
-                });    
-            })    
+                return singedJwt;
+            })
             .catch(e => {
                 console.error(e);
                 
                 document.getElementById("error_details").innerText = error.error+"\n\n"+error.error_description;
                 document.getElementById("error").classList = "";
-                
             });    
             
             localStorage.setItem('dpopHeader', dpopHeader);
