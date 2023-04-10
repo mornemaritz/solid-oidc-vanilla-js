@@ -5,7 +5,7 @@
 // Configure your application and authorization server details
 var config = {
     // client_id: "https://app.mornemaritz.tech/myappid#this",
-    client_id: "",
+    client_id: "a8aee625-6171-44e7-b708-983272190c9c",
     redirect_uri: "http://localhost:1234/",
     authorization_endpoint: "https://login.inrupt.com/authorization",
     token_endpoint: "https://login.inrupt.com/token",
@@ -357,7 +357,16 @@ function uint8ToUrlBase64(uint8) {
                 },
                 body: Object.keys(params).map(key => key + '=' + params[key]).join('&')
             })
-            .then(async response => await response.json())
+            .then(async response => {
+                if (!response.ok) {
+                    if(response.status < 500)
+                    {
+                        const errorResponse = await response.json();
+                        throw errorResponse;
+                    }
+                } 
+                return await response.json()
+            })
             .then(responseJson => {
                 // Initialize your application now that you have an access token.
                 // Here we just display it in the browser.
@@ -377,7 +386,7 @@ function uint8ToUrlBase64(uint8) {
             .catch(e => {
                 console.error(e);
 
-                document.getElementById("error_details").innerText = error.error+"\n\n"+error.error_description;
+                document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
                 document.getElementById("error").classList = "";
 
             });
