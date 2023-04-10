@@ -5,7 +5,8 @@
 // Configure your application and authorization server details
 var config = {
     // client_id: "https://app.mornemaritz.tech/myappid#this",
-    client_id: "a8aee625-6171-44e7-b708-983272190c9c",
+    client_id: "",
+    client_secret: "",
     redirect_uri: "http://localhost:1234/",
     authorization_endpoint: "https://login.inrupt.com/authorization",
     token_endpoint: "https://login.inrupt.com/token",
@@ -353,7 +354,8 @@ function uint8ToUrlBase64(uint8) {
                 method: 'POST',
                 headers: {
                     'DPoP': dpopHeader,
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'Authorization': 'Basic ' + btoa(config.client_id + ":" + config.client_secret)
                 },
                 body: Object.keys(params).map(key => key + '=' + params[key]).join('&')
             })
