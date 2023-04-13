@@ -1,5 +1,5 @@
 <html>
-<title>Sign JWTs with WebCrypto in Vanilla JS</title>
+<title>SOLID OIDC in Vanilla JS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <script>
 // Configure your application and authorization server details
@@ -8,9 +8,11 @@ var config = {
     client_id: "",
     client_secret: "",
     redirect_uri: "http://localhost:1234/",
+    requested_scopes: "openid offline_access",
     authorization_endpoint: "https://login.inrupt.com/authorization",
     token_endpoint: "https://login.inrupt.com/token",
-    requested_scopes: "openid offline_access"
+    // authorization_endpoint: "https://solidcommunity.net/authorize",
+    // token_endpoint: "https://solidcommunity.net/token"
 };
 </script>
 
