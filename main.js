@@ -1,6 +1,7 @@
 
 // Configure your application and authorization server details
-var config = {
+const config = {
+    web_id: "https://mornemaritz.solidcommunity.net/profile/card#me",
     // client_id: "https://app.mornemaritz.tech/myappid#this",
     client_id: "e26bc368528ffcf1933b609e30807240",
     client_secret: "b8809bb453a3248cae56bce35a57f2d5",
@@ -20,8 +21,6 @@ https://github.com/aaronpk/pkce-vanilla-js/blob/master/index.html
 */
 //////////////////////////////////////////////////////////////////////
 // OAUTH REQUEST
-document.addEventListener("DOMContentLoaded", function(event) { 
-  //do work
 // Initiate the PKCE Auth Code flow when the link is clicked
 document.getElementById("start").addEventListener("click", async function(e){
     e.preventDefault();
@@ -95,7 +94,7 @@ function base64urlencode(string) {
 
 // Return the base64-urlencoded sha256 hash for the PKCE challenge
 async function pkceChallengeFromVerifier(v) {
-    hashed = await sha256(v);
+    const hashed = await sha256(v);
     // Convert the ArrayBuffer to string using Uint8 array to convert to what btoa accepts.
     let stringyfiedHash = String.fromCharCode.apply(null, new Uint8Array(hashed))
     return base64urlencode(stringyfiedHash);
@@ -371,5 +370,3 @@ function uint8ToUrlBase64(uint8) {
     }
 
 })();
-
-});
