@@ -1,0 +1,31 @@
+{
+  "name": "solid-oidc-vanilla",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com-mornemaritz:mornemaritz/solid-oidc-vanilla-js.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "webpack": "^5.79.0",
+    "webpack-cli": "^5.0.1"
+  },
+  "dependencies": {
+    "n3": "^1.16.4"
+  },
+  "browserslist": [
+    "last 1 and_chr versions",
+    "last 1 chrome versions",
+    "last 1 opera versions",
+    "last 1 ios_saf versions",
+    "last 1 safari versions",
+    "last 1 edge versions"
+  ]
+}

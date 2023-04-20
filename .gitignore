@@ -1,0 +1,7 @@
+/node_modules
+
+# The entire contents of the dist folder should be gitignored.
+# This will be done once the currently manually placed index.html
+# and styles.css are also included in the webpack process
+/dist/main.js
+/dist/main.js.LICENSE.txt

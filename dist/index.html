@@ -9,11 +9,16 @@
 <body>
     <div class="flex-center full-height">
         <div class="content">
-            <a href="#" id="start">Click to sign In</a>
-            <div id="token" class="hidden">
-                <h2>Access Token</h2>
-                <div id="access_token" class="code"></div>
+            <div>
+                <a href="#" id="getWebIdDocument">Click to get WebID Document</a>
+            </div>
+            <div id="solid_oidc_issuer_div" class="hidden">
+                <h2>Solid OIDC Issuer</h2>
+                <div id="solid_oidc_issuer" class="code"></div>
             </div> 
+            <div id="sign_in" class="hidden">
+                <a href="#" id="start">Click to sign In</a>
+            </div>
             <div id="code_verifier" class="hidden">
                 <h2>Code Verifier</h2>
                 <div id="pkce_code_verifier" class="code"></div>

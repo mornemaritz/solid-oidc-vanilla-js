@@ -1,4 +1,4 @@
-
+import { Parser } from 'n3';
 // Configure your application and authorization server details
 const config = {
     web_id: "https://mornemaritz.solidcommunity.net/profile/card#me",
@@ -12,7 +12,44 @@ const config = {
     authorization_endpoint: "https://solidcommunity.net/authorize",
     token_endpoint: "https://solidcommunity.net/token"
   };
-  
+
+    document.getElementById("getWebIdDocument").addEventListener("click", async e => {
+        e.preventDefault();
+
+        await fetch(config.web_id)
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            return await response.text()
+        })
+        .then(responseText => {
+            var parser = new Parser();
+            parser.parse(responseText,
+                (err,quad,prefixes) => {
+                    
+                    if (quad) {
+                        console.log(quad.object.value);
+                        console.log(quad.predicate.value);
+    
+                        if (quad.predicate.id == "http://www.w3.org/ns/solid/terms#oidcIssuer") {
+                            localStorage.setItem("solid_oidc_issuer", quad.object.value)
+                            document.getElementById("solid_oidc_issuer").innerText = quad.object.value;
+                            document.getElementById("solid_oidc_issuer_div").classList = "";
+                        }
+                    } else if (err) {
+                        console.error(err);
+                    } else {
+                        console.log("Prefixes", prefixes);
+                    }
+                })
+        })
+    })
+
   /*
 Based on https://solidproject.org/TR/oidc-primer
 Written using a Combination of 
