@@ -1,17 +1,26 @@
 import { Parser } from 'n3';
 // Configure your application and authorization server details
 const config = {
-    web_id: "https://mornemaritz.solidcommunity.net/profile/card#me",
-    // client_id: "https://app.mornemaritz.tech/myappid#this",
-    client_id: "e26bc368528ffcf1933b609e30807240",
-    client_secret: "b8809bb453a3248cae56bce35a57f2d5",
+    web_id: "https://id.inrupt.com/mornemaritz",
+    // web_id: "https://mornemaritz.solidcommunity.net/profile/card#me",
     redirect_uri: "http://localhost:1234/",
     requested_scopes: "openid offline_access",
-    // authorization_endpoint: "https://login.inrupt.com/authorization",
-    // token_endpoint: "https://login.inrupt.com/token",
-    authorization_endpoint: "https://solidcommunity.net/authorize",
-    token_endpoint: "https://solidcommunity.net/token"
   };
+
+const client_config = {
+	client_name:"https://app.mornemaritz.tech/myappid#this",
+	application_type:"web",
+	redirect_uris: [
+		"http://localhost:1234/"
+	],
+	subject_type:"public",
+	token_endpoint_auth_method:"client_secret_basic",
+	id_token_signed_response_alg:"RS256",
+	grant_types:[
+		"authorization_code",
+		"refresh_token"
+	]
+}
 
     document.getElementById("getWebIdDocument").addEventListener("click", async e => {
         e.preventDefault();
@@ -48,8 +57,87 @@ const config = {
                     }
                 })
         })
+        .catch(e => {
+            console.error(e);
+
+            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+            document.getElementById("error").classList = "";
+
+        });
+    })
+    
+    document.getElementById("getOpConfiguration").addEventListener("click", async e => {
+        e.preventDefault();
+
+        var openidConfiguration = `${localStorage.getItem("solid_oidc_issuer")}/.well-known/openid-configuration`;
+        
+        await fetch(openidConfiguration)
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            return await response.json()
+        })
+        .then(oidConfig => {
+            console.log(oidConfig);
+            localStorage.setItem("authorization_endpoint", oidConfig.authorization_endpoint);
+            localStorage.setItem("token_endpoint", oidConfig.token_endpoint);
+            localStorage.setItem("registration_endpoint", oidConfig.registration_endpoint);
+
+            document.getElementById("authorization_endpoint").innerText = oidConfig.authorization_endpoint;
+            document.getElementById("authorization_endpoint_div").classList = "";
+            
+        })
+        .catch(e => {
+            console.error(e);
+
+            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+            document.getElementById("error").classList = "";
+
+        });
     })
 
+    document.getElementById("registerClient").addEventListener("click", async e => {
+        e.preventDefault();
+
+        await fetch(localStorage.getItem("registration_endpoint"), {
+            method: 'POST',
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(client_config)
+        }) 
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            return await response.json()
+        })
+        .then(clientRegistrationResponse => {
+            console.log(clientRegistrationResponse);
+            localStorage.setItem("client_id", clientRegistrationResponse.client_id);
+            localStorage.setItem("client_secret", clientRegistrationResponse.client_secret);
+
+            document.getElementById("client_id").innerText = clientRegistrationResponse.client_id;
+            document.getElementById("client_id_div").classList = "";
+            
+        })
+        .catch(e => {
+            console.error(e);
+
+            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+            document.getElementById("error").classList = "";
+
+        });
+    })
   /*
 Based on https://solidproject.org/TR/oidc-primer
 Written using a Combination of 
@@ -79,9 +167,9 @@ document.getElementById("start").addEventListener("click", async function(e){
     localStorage.setItem("pkce_code_challenge", code_challenge);
 
     // Build the authorization URL
-    var url = config.authorization_endpoint 
+    var url = localStorage.getItem("authorization_endpoint")
     + "?response_type=code"
-    + "&client_id="+encodeURIComponent(config.client_id)
+    + "&client_id="+encodeURIComponent(localStorage.getItem("client_id"))
     + "&state="+encodeURIComponent(state)
     + "&scope="+encodeURIComponent(config.requested_scopes)
     + "&redirect_uri="+encodeURIComponent(config.redirect_uri)
@@ -315,7 +403,7 @@ function uint8ToUrlBase64(uint8) {
         } else {
             // tokenBody
             let claims = {
-                "htu": config.token_endpoint,
+                "htu": localStorage.getItem("token_endpoint"),
                 "htm": "POST",
                 "jti": generateRandomString(),
                 "iat": Math.round(Date.now() / 1000)
@@ -356,17 +444,17 @@ function uint8ToUrlBase64(uint8) {
             const params = {
                 grant_type: "authorization_code",
                 code: q.code,
-                client_id: config.client_id,
+                client_id: localStorage.getItem("client_id"),
                 redirect_uri: config.redirect_uri,
                 code_verifier: localStorage.getItem("pkce_code_verifier")
             }
 
-            await fetch(config.token_endpoint, {
+            await fetch(localStorage.getItem("token_endpoint"), {
                 method: 'POST',
                 headers: {
                     'DPoP': dpopHeader,
                     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                    'Authorization': 'Basic ' + btoa(config.client_id + ":" + config.client_secret)
+                    'Authorization': 'Basic ' + btoa(localStorage.getItem("client_id") + ":" + localStorage.getItem("client_secret"))
                 },
                 body: Object.keys(params).map(key => key + '=' + params[key]).join('&')
             })
@@ -384,7 +472,7 @@ function uint8ToUrlBase64(uint8) {
                 // Initialize your application now that you have an access token.
                 // Here we just display it in the browser.
                 document.getElementById("access_token").innerText = responseJson.access_token;
-                document.getElementById("start").classList = "hidden";
+                document.getElementById("sign_in").classList = "hidden";
                 document.getElementById("token").classList = "";
                 
                 document.getElementById("pkce_code_verifier").innerText = localStorage.getItem("pkce_code_verifier");
