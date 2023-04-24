@@ -5,6 +5,7 @@ const config = {
     // web_id: "https://mornemaritz.solidcommunity.net/profile/card#me",
     redirect_uri: "http://localhost:1234/",
     requested_scopes: "openid offline_access",
+    resource_uri: "https://storage.inrupt.com/4ba483d1-894b-4156-856f-5ce1c7efad4d/profile" 
   };
 
 const client_config = {
@@ -138,6 +139,72 @@ const client_config = {
 
         });
     })
+
+
+    document.getElementById("discoverResourceAuthServer").addEventListener("click", async e => {
+        e.preventDefault();
+
+        await fetch(config.resource_uri)
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status == 401) {
+                    let rs_auth_server = parseWwwAuthenticateHeader(response.headers.get('www-authenticate'));
+                    console.log(rs_auth_server);
+                    localStorage.setItem('rs_auth_server', JSON.stringify(rs_auth_server));
+
+                    document.getElementById("resource_auth_server").innerText = rs_auth_server.as_url;
+                    document.getElementById("resource_auth_server_div").classList = "";
+                }
+                else if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            return await response.json()
+        })
+        .catch(e => {
+            console.error(e);
+
+            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+            document.getElementById("error").classList = "";
+
+        });
+        
+    })
+
+    document.getElementById('requestAuthServerConfig').addEventListener("click", async e => {
+        e.preventDefault();
+
+        const rs_auth_server = JSON.parse(localStorage.getItem('rs_auth_server'));
+
+        await fetch(`${rs_auth_server.as_url}/.well-known/uma2-configuration`)
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            return await response.json()
+        })
+        .then(uma_config => {
+            console.log(uma_config);
+            localStorage.setItem("uma_config", uma_config);
+
+            document.getElementById("as_token_endpoint").innerText = uma_config.token_endpoint;
+            document.getElementById("as_token_endpoint_div").classList = "";
+            
+        })
+        .catch(e => {
+            console.error(e);
+
+            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+            document.getElementById("error").classList = "";
+
+        });
+    })
   /*
 Based on https://solidproject.org/TR/oidc-primer
 Written using a Combination of 
@@ -188,6 +255,24 @@ function parseQueryString(string) {
     var queryString = {};
     segments.forEach(s => queryString[s[0]] = s[1]);
     return queryString;
+}
+
+function parseWwwAuthenticateHeader(wwwAuthenticateHeader){
+    console.log(`wwwAuthenticateHeader: ${wwwAuthenticateHeader}`);
+    let tokens = wwwAuthenticateHeader.split(',');
+    let umaTagAndAsUrl = tokens[0].split(' ');
+    if (umaTagAndAsUrl[0].toLowerCase() != 'uma') {
+        throw new Error(`wwwAuthenticateHeader not UMA: ${umaTagAndAsUrl[0].toLowerCase()}`);
+    }    
+    
+    let authTicket = tokens[1].split('=');
+
+    return {
+        as_url: umaTagAndAsUrl[1].split('=')[1].replaceAll('"',''),
+        ticket : authTicket[1].replaceAll('"',''),
+        auth_types: tokens[2].split(' ').map(s => s.replaceAll('"','')),
+        dpop_algs: tokens[3].split('=')[1].split(' ').map(s => s.replaceAll('"',''))
+    }
 }
 
 //////////////////////////////////////////////////////////////////////
