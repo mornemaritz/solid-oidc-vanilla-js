@@ -191,11 +191,72 @@ const client_config = {
         })
         .then(uma_config => {
             console.log(uma_config);
-            localStorage.setItem("uma_config", uma_config);
+            localStorage.setItem("uma_config", JSON.stringify(uma_config));
 
             document.getElementById("as_token_endpoint").innerText = uma_config.token_endpoint;
             document.getElementById("as_token_endpoint_div").classList = "";
             
+        })
+        .catch(e => {
+            console.error(e);
+
+            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+            document.getElementById("error").classList = "";
+
+        });
+    })
+
+    document.getElementById('requestAccessToken').addEventListener('click', async e => {
+        e.preventDefault();
+
+        var uma_config = JSON.parse(localStorage.getItem("uma_config"));
+        var rs_auth_server = JSON.parse(localStorage.getItem('rs_auth_server'));
+
+        // tokenBody
+        let claims = {
+            "htu": uma_config.token_endpoint,
+            "htm": "POST",
+            "jti": generateRandomString(),
+            "iat": Math.round(Date.now() / 1000)
+        }
+
+        const params = {
+            grant_type: encodeURIComponent(uma_config.grant_types_supported[0]),
+            ticket: rs_auth_server.ticket,
+            claim_token: localStorage.getItem("access_token"),
+            claim_token_format: encodeURIComponent(uma_config.uma_profiles_supported[1]) 
+        }
+
+        var dpopHeader = await generateDpopHeader(claims);
+
+        await fetch(uma_config.token_endpoint, {
+            method: 'POST',
+            headers: {
+                'DPoP': dpopHeader,
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Authorization': 'Basic ' + btoa(localStorage.getItem("client_id") + ":" + localStorage.getItem("client_secret"))
+            },
+            body: Object.keys(params).map(key => key + '=' + params[key]).join('&')
+        })
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            return await response.json()
+        })
+        .then(responseJson => {
+            // Initialize your application now that you have an access token.
+            // Here we just display it in the browser.
+            localStorage.setItem('resource_access_token', responseJson.access_token);
+            document.getElementById("resource_access_token").innerText = responseJson.access_token;
+            document.getElementById("resource_access_token_div").classList = "";
+
+            // Replace the history entry to remove the auth code from the browser address bar
+            window.history.replaceState({}, null, "/");
         })
         .catch(e => {
             console.error(e);
@@ -462,6 +523,35 @@ function uint8ToUrlBase64(uint8) {
     return binToUrlBase64(bin);
 }
 
+async function generateDpopHeader(claims) {
+    
+    return await getGenerateJsonWebKeyAndThumbprint() 
+    .then(async jwkAndThumbprint => {
+        // return JWT.sign(jwk, { kid: kid }, claims)
+        return await JWT.sign(jwkAndThumbprint.jwk, {}, claims)
+    })
+    .then(singedJwt => {
+        console.info('JWT:', singedJwt);
+        
+        return singedJwt;
+    })
+}
+
+async function getGenerateJsonWebKeyAndThumbprint() {
+    return JSON.parse(localStorage.getItem('json_web_key_and_thumbprint'))
+    || await EC.generate()
+    .then(async jwk => {
+        console.info('Private Key:', JSON.stringify(jwk));
+        console.info('Public Key:', JSON.stringify(EC.neuter(jwk)));
+
+        const thumbprint = await JWK.thumbprint(jwk);
+        const jsonWebKeyAndThumbprint = { jwk, thumbprint }
+        localStorage.setItem('json_web_key_and_thumbprint', JSON.stringify(jsonWebKeyAndThumbprint));
+
+        return jsonWebKeyAndThumbprint
+    })
+}
+
 
 //////////////////////////////////////////////////////////////////////
 // OAUTH REDIRECT HANDLING
@@ -487,61 +577,39 @@ function uint8ToUrlBase64(uint8) {
             alert("Invalid state");
         } else {
             // tokenBody
-            let claims = {
+            const claims = {
                 "htu": localStorage.getItem("token_endpoint"),
                 "htm": "POST",
                 "jti": generateRandomString(),
                 "iat": Math.round(Date.now() / 1000)
             }
         
-            // Step 12. Generates a DPoP Client Key Pair
-            // https://solidproject.org/TR/oidc-primer#authorization-code-pkce-flow-step-12
-        
-            // Step 13. Generates a DPoP Header 
-            // https://solidproject.org/TR/oidc-primer#authorization-code-pkce-flow-step-13
-            // var dpopHeader = await generateDpopHeader();
-            var dpopHeader = await EC.generate()
-            .then(async jwk => {
-                console.info('Private Key:', JSON.stringify(jwk));
-                console.info('Public Key:', JSON.stringify(EC.neuter(jwk)));
-                const thumbprint = await JWK.thumbprint(jwk);
-
-                return { jwk, thumbprint }
-            })
-            .then(async x => {
-                // return JWT.sign(jwk, { kid: kid }, claims)
-                return await JWT.sign(x.jwk, {}, claims)
-            })
-            .then(singedJwt => {
-                console.info('JWT:', singedJwt);
-                
-                return singedJwt;
-            })
-            .catch(e => {
-                console.error(e);
-                
-                document.getElementById("error_details").innerText = error.error+"\n\n"+error.error_description;
-                document.getElementById("error").classList = "";
-            });    
-            
-            localStorage.setItem('dpopHeader', dpopHeader);
-
-            const params = {
+            const requestParams = {
                 grant_type: "authorization_code",
                 code: q.code,
                 client_id: localStorage.getItem("client_id"),
                 redirect_uri: config.redirect_uri,
                 code_verifier: localStorage.getItem("pkce_code_verifier")
             }
+            // Step 12. Generates a DPoP Client Key Pair
+            // https://solidproject.org/TR/oidc-primer#authorization-code-pkce-flow-step-12
+        
+            // Step 13. Generates a DPoP Header 
+            // https://solidproject.org/TR/oidc-primer#authorization-code-pkce-flow-step-13
+            await generateDpopHeader(claims)
+            .then(async dpopHeader => {
+                console.log(`dpopHeader: ${dpopHeader}`);
+                localStorage.setItem('dpopHeader', dpopHeader);
 
-            await fetch(localStorage.getItem("token_endpoint"), {
-                method: 'POST',
-                headers: {
-                    'DPoP': dpopHeader,
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                    'Authorization': 'Basic ' + btoa(localStorage.getItem("client_id") + ":" + localStorage.getItem("client_secret"))
-                },
-                body: Object.keys(params).map(key => key + '=' + params[key]).join('&')
+                return await fetch(localStorage.getItem("token_endpoint"), {
+                    method: 'POST',
+                    headers: {
+                        'DPoP': dpopHeader,
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'Authorization': 'Basic ' + btoa(localStorage.getItem("client_id") + ":" + localStorage.getItem("client_secret"))
+                    },
+                    body: Object.keys(requestParams).map(key => key + '=' + requestParams[key]).join('&')
+                })
             })
             .then(async response => {
                 if (!response.ok) {
@@ -556,6 +624,8 @@ function uint8ToUrlBase64(uint8) {
             .then(responseJson => {
                 // Initialize your application now that you have an access token.
                 // Here we just display it in the browser.
+                localStorage.setItem("access_token", responseJson.access_token);
+
                 document.getElementById("access_token").innerText = responseJson.access_token;
                 document.getElementById("sign_in").classList = "hidden";
                 document.getElementById("token").classList = "";
