@@ -213,22 +213,15 @@ const client_config = {
     document.getElementById('viewResource').addEventListener('click', async e => {
         e.preventDefault();
 
-        const rs_auth_server = JSON.parse(localStorage.getItem('rs_auth_server'));
+        let claims = {
+            "htu": config.resource_uri,
+            "htm": "GET",
+            "jti": generateRandomString(),
+            "iat": Math.round(Date.now() / 1000)
+        }
 
-        await requestAuthServerConfig(rs_auth_server)
-        .then((uma_config) => requestResourceAccessToken(uma_config, rs_auth_server))
-        .then(async responseJson => {
-            const resource_access_token = responseJson.access_token;
-
-            let claims = {
-                "htu": config.resource_uri,
-                "htm": "GET",
-                "jti": generateRandomString(),
-                "iat": Math.round(Date.now() / 1000)
-            }
-
-            var resourceDPoPHeader = await generateDpopHeader(claims);
-
+        await generateDpopHeader(claims)
+        .then(async resourceDPoPHeader => {
             return await fetch(config.resource_uri, {
                 headers : {
                     'Authorization': `DPoP ${localStorage.getItem('user_access_token')}`,
