@@ -33,6 +33,18 @@
             <div id="sign_in">
                 <a href="#" id="start">Click to sign In</a>
             </div>
+            <div id="code_verifier" class="hidden">
+                <h4>Code Verifier</h4>
+                <div id="pkce_code_verifier" class="code"></div>
+            </div>
+            <div id="code_challenge" class="hidden">
+                <h4>PKCE Challenge</h4>
+                <div id="pkce_code_challenge" class="code"></div>
+            </div>
+            <div id="token" class="hidden">
+                <h4>User Access Token</h4>
+                <div id="user_access_token" class="code"></div>
+            </div>
             <div>
                 <a href="#" id="discoverResourceAuthServer">1. Discover Resource Authorization Server (AS)</a>
             </div>
@@ -48,25 +60,20 @@
                 <div id="as_token_endpoint" class="code"></div>
             </div> 
             <div>
-                <a href="#" id="requestAccessToken">4. Request Resource Access Token</a>
+                <a href="#" id="requestResourceAccessToken">4. Request Resource Access Token</a>
             </div>
             <div id="resource_access_token_div" class="hidden">
                 <h4>Resource Access Token</h4>
                 <div id="resource_access_token" class="code"></div>
             </div> 
+            <div>
+                <a href="#" id="viewResource">View Access Managed Resource</a>
+            </div>
+            <div id="resource_div" class="hidden">
+                <h4>Resource Access Token</h4>
+                <div id="resource:width" class="code"></div>
+            </div> 
 
-            <div id="code_verifier" class="hidden">
-                <h4>Code Verifier</h4>
-                <div id="pkce_code_verifier" class="code"></div>
-            </div>
-            <div id="code_challenge" class="hidden">
-                <h4>PKCE Challenge</h4>
-                <div id="pkce_code_challenge" class="code"></div>
-            </div>
-            <div id="token" class="hidden">
-                <h4>Access Token</h4>
-                <div id="access_token" class="code"></div>
-            </div>
             <div id="error" class="hidden">
                 <h4>Error</h4>
                 <div id="error_details" class="code"></div>

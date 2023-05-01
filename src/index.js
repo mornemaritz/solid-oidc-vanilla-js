@@ -2,10 +2,11 @@ import { Parser } from 'n3';
 // Configure your application and authorization server details
 const config = {
     web_id: "https://id.inrupt.com/mornemaritz",
+    resource_uri: "https://storage.inrupt.com/4ba483d1-894b-4156-856f-5ce1c7efad4d/profile", 
     // web_id: "https://mornemaritz.solidcommunity.net/profile/card#me",
+    // resource_uri: "https://mornemaritz.solidcommunity.net/private",
     redirect_uri: "http://localhost:1234/",
-    requested_scopes: "openid offline_access",
-    resource_uri: "https://storage.inrupt.com/4ba483d1-894b-4156-856f-5ce1c7efad4d/profile" 
+    requested_scopes: "openid offline_access"
   };
 
 const client_config = {
@@ -176,82 +177,24 @@ const client_config = {
     document.getElementById('requestAuthServerConfig').addEventListener("click", async e => {
         e.preventDefault();
 
-        const rs_auth_server = JSON.parse(localStorage.getItem('rs_auth_server'));
-
-        await fetch(`${rs_auth_server.as_url}/.well-known/uma2-configuration`)
-        .then(async response => {
-            if (!response.ok) {
-                if(response.status < 500)
-                {
-                    const errorResponse = await response.json();
-                    throw errorResponse;
-                }
-            } 
-            return await response.json()
-        })
+        await requestAuthServerConfig(JSON.parse(localStorage.getItem('rs_auth_server')))    
         .then(uma_config => {
-            console.log(uma_config);
-            localStorage.setItem("uma_config", JSON.stringify(uma_config));
-
             document.getElementById("as_token_endpoint").innerText = uma_config.token_endpoint;
             document.getElementById("as_token_endpoint_div").classList = "";
-            
         })
         .catch(e => {
             console.error(e);
 
             document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
             document.getElementById("error").classList = "";
-
         });
     })
 
-    document.getElementById('requestAccessToken').addEventListener('click', async e => {
+    document.getElementById('requestResourceAccessToken').addEventListener('click', async e => {
         e.preventDefault();
 
-        var uma_config = JSON.parse(localStorage.getItem("uma_config"));
-        var rs_auth_server = JSON.parse(localStorage.getItem('rs_auth_server'));
-
-        // tokenBody
-        let claims = {
-            "htu": uma_config.token_endpoint,
-            "htm": "POST",
-            "jti": generateRandomString(),
-            "iat": Math.round(Date.now() / 1000)
-        }
-
-        const params = {
-            grant_type: encodeURIComponent(uma_config.grant_types_supported[0]),
-            ticket: rs_auth_server.ticket,
-            claim_token: localStorage.getItem("access_token"),
-            claim_token_format: encodeURIComponent(uma_config.uma_profiles_supported[1]) 
-        }
-
-        var dpopHeader = await generateDpopHeader(claims);
-
-        await fetch(uma_config.token_endpoint, {
-            method: 'POST',
-            headers: {
-                'DPoP': dpopHeader,
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Authorization': 'Basic ' + btoa(localStorage.getItem("client_id") + ":" + localStorage.getItem("client_secret"))
-            },
-            body: Object.keys(params).map(key => key + '=' + params[key]).join('&')
-        })
-        .then(async response => {
-            if (!response.ok) {
-                if(response.status < 500)
-                {
-                    const errorResponse = await response.json();
-                    throw errorResponse;
-                }
-            } 
-            return await response.json()
-        })
+        await requestResourceAccessToken(JSON.parse(localStorage.getItem("uma_config")), JSON.parse(localStorage.getItem('rs_auth_server')))
         .then(responseJson => {
-            // Initialize your application now that you have an access token.
-            // Here we just display it in the browser.
-            localStorage.setItem('resource_access_token', responseJson.access_token);
             document.getElementById("resource_access_token").innerText = responseJson.access_token;
             document.getElementById("resource_access_token_div").classList = "";
 
@@ -265,6 +208,67 @@ const client_config = {
             document.getElementById("error").classList = "";
 
         });
+    })
+
+    document.getElementById('viewResource').addEventListener('click', async e => {
+        e.preventDefault();
+
+        const rs_auth_server = JSON.parse(localStorage.getItem('rs_auth_server'));
+
+        await requestAuthServerConfig(rs_auth_server)
+        .then((uma_config) => requestResourceAccessToken(uma_config, rs_auth_server))
+        .then(async responseJson => {
+            const resource_access_token = responseJson.access_token;
+
+            let claims = {
+                "htu": config.resource_uri,
+                "htm": "GET",
+                "jti": generateRandomString(),
+                "iat": Math.round(Date.now() / 1000)
+            }
+
+            var resourceDPoPHeader = await generateDpopHeader(claims);
+
+            return await fetch(config.resource_uri, {
+                headers : {
+                    'Authorization': `DPoP ${localStorage.getItem('user_access_token')}`,
+                    'DPoP': `${resourceDPoPHeader}`
+                }
+            })
+        })
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            return await response.text()
+        })
+        .then(responseText => {
+            var parser = new Parser();
+            parser.parse(responseText,
+                (err,quad,prefixes) => {
+                    
+                    if (quad) {
+                        console.log(quad.object.value);
+                        console.log(quad.predicate.value);
+                    } else if (err) {
+                        console.error(err);
+                    } else {
+                        console.log("Prefixes", prefixes);
+                    }
+                })
+        })
+        .catch(e => {
+            console.error(e);
+
+            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+            document.getElementById("error").classList = "";
+
+        });
+
     })
   /*
 Based on https://solidproject.org/TR/oidc-primer
@@ -321,19 +325,97 @@ function parseQueryString(string) {
 function parseWwwAuthenticateHeader(wwwAuthenticateHeader){
     console.log(`wwwAuthenticateHeader: ${wwwAuthenticateHeader}`);
     let tokens = wwwAuthenticateHeader.split(',');
-    let umaTagAndAsUrl = tokens[0].split(' ');
-    if (umaTagAndAsUrl[0].toLowerCase() != 'uma') {
-        throw new Error(`wwwAuthenticateHeader not UMA: ${umaTagAndAsUrl[0].toLowerCase()}`);
+    let resourceServerAuthConfig = tokens[0].split(' ');
+    if (resourceServerAuthConfig[0].toLowerCase() != 'uma') {
+        throw new Error(`wwwAuthenticateHeader not UMA: ${resourceServerAuthConfig[0].toLowerCase()}`);
     }    
     
     let authTicket = tokens[1].split('=');
 
     return {
-        as_url: umaTagAndAsUrl[1].split('=')[1].replaceAll('"',''),
+        as_url: resourceServerAuthConfig[1].split('=')[1].replaceAll('"',''),
         ticket : authTicket[1].replaceAll('"',''),
         auth_types: tokens[2].split(' ').map(s => s.replaceAll('"','')),
         dpop_algs: tokens[3].split('=')[1].split(' ').map(s => s.replaceAll('"',''))
     }
+}
+
+async function requestAuthServerConfig(rs_auth_server) {
+
+    if(!rs_auth_server) {
+        throw new Error("rs_auth_server not specified");
+    }
+
+    return await fetch(`${rs_auth_server.as_url}/.well-known/uma2-configuration`)
+    .then(async response => {
+        if (!response.ok) {
+            if(response.status < 500)
+            {
+                const errorResponse = await response.json();
+                throw errorResponse;
+            }
+        } 
+        return await response.json()
+    })
+    .then(uma_config => {
+        localStorage.setItem("uma_config", JSON.stringify(uma_config));
+
+        return uma_config;
+    })
+}
+
+async function requestResourceAccessToken(uma_config, rs_auth_server) {
+    if(!uma_config) {
+        throw new Error("uma_config not specified");
+    }
+
+    if (!rs_auth_server) {
+        throw new Error("rs_auth_server not specified");
+    }
+
+    // tokenBody
+    let claims = {
+        "htu": uma_config.token_endpoint,
+        "htm": "POST",
+        "jti": generateRandomString(),
+        "iat": Math.round(Date.now() / 1000)
+    }
+
+    const params = {
+        grant_type: encodeURIComponent(uma_config.grant_types_supported[0]),
+        ticket: rs_auth_server.ticket,
+        claim_token: localStorage.getItem("user_access_token"),
+        claim_token_format: encodeURIComponent(uma_config.uma_profiles_supported[1]) 
+    }
+
+    var resourceDPoPHeader = await generateDpopHeader(claims);
+    localStorage.setItem('resource_dpop_header', resourceDPoPHeader);
+
+    return await fetch(uma_config.token_endpoint, {
+        method: 'POST',
+        headers: {
+            'DPoP': resourceDPoPHeader,
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Authorization': 'Basic ' + btoa(localStorage.getItem("client_id") + ":" + localStorage.getItem("client_secret"))
+        },
+        body: Object.keys(params).map(key => key + '=' + params[key]).join('&')
+    })
+    .then(async response => {
+        if (!response.ok) {
+            if(response.status < 500)
+            {
+                const errorResponse = await response.json();
+                throw errorResponse;
+            }
+        } 
+        return await response.json()
+    })
+    .then(responseJson => {
+
+        localStorage.setItem('resource_access_token', responseJson.access_token);
+
+        return responseJson;
+    })
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -538,18 +620,22 @@ async function generateDpopHeader(claims) {
 }
 
 async function getGenerateJsonWebKeyAndThumbprint() {
-    return JSON.parse(localStorage.getItem('json_web_key_and_thumbprint'))
-    || await EC.generate()
-    .then(async jwk => {
-        console.info('Private Key:', JSON.stringify(jwk));
-        console.info('Public Key:', JSON.stringify(EC.neuter(jwk)));
-
-        const thumbprint = await JWK.thumbprint(jwk);
-        const jsonWebKeyAndThumbprint = { jwk, thumbprint }
-        localStorage.setItem('json_web_key_and_thumbprint', JSON.stringify(jsonWebKeyAndThumbprint));
-
-        return jsonWebKeyAndThumbprint
-    })
+    const json_web_key_and_thumbprint = localStorage.getItem('json_web_key_and_thumbprint');
+    if (json_web_key_and_thumbprint) {
+        return JSON.parse(json_web_key_and_thumbprint);
+    } else {
+        return await EC.generate()
+        .then(async jwk => {
+            console.info('Private Key:', JSON.stringify(jwk));
+            console.info('Public Key:', JSON.stringify(EC.neuter(jwk)));
+    
+            const thumbprint = await JWK.thumbprint(jwk);
+            const jsonWebKeyAndThumbprint = { jwk, thumbprint }
+            localStorage.setItem('json_web_key_and_thumbprint', JSON.stringify(jsonWebKeyAndThumbprint));
+    
+            return jsonWebKeyAndThumbprint
+        })
+    }
 }
 
 
@@ -597,14 +683,14 @@ async function getGenerateJsonWebKeyAndThumbprint() {
             // Step 13. Generates a DPoP Header 
             // https://solidproject.org/TR/oidc-primer#authorization-code-pkce-flow-step-13
             await generateDpopHeader(claims)
-            .then(async dpopHeader => {
-                console.log(`dpopHeader: ${dpopHeader}`);
-                localStorage.setItem('dpopHeader', dpopHeader);
+            .then(async userDPoPHeader => {
+                console.log(`userDPoPHeader: ${userDPoPHeader}`);
+                localStorage.setItem('user_dpop_header', userDPoPHeader);
 
                 return await fetch(localStorage.getItem("token_endpoint"), {
                     method: 'POST',
                     headers: {
-                        'DPoP': dpopHeader,
+                        'DPoP': userDPoPHeader,
                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                         'Authorization': 'Basic ' + btoa(localStorage.getItem("client_id") + ":" + localStorage.getItem("client_secret"))
                     },
@@ -624,9 +710,9 @@ async function getGenerateJsonWebKeyAndThumbprint() {
             .then(responseJson => {
                 // Initialize your application now that you have an access token.
                 // Here we just display it in the browser.
-                localStorage.setItem("access_token", responseJson.access_token);
+                localStorage.setItem("user_access_token", responseJson.access_token);
 
-                document.getElementById("access_token").innerText = responseJson.access_token;
+                document.getElementById("user_access_token").innerText = responseJson.access_token;
                 document.getElementById("sign_in").classList = "hidden";
                 document.getElementById("token").classList = "";
                 
