@@ -2,7 +2,8 @@ import { Parser } from 'n3';
 // Configure your application and authorization server details
 const config = {
     web_id: "https://id.inrupt.com/mornemaritz",
-    resource_uri: "https://storage.inrupt.com/4ba483d1-894b-4156-856f-5ce1c7efad4d/profile", 
+    resource_uri: "https://storage.inrupt.com/4ba483d1-894b-4156-856f-5ce1c7efad4d/profile",
+    root_container: "https://storage.inrupt.com/4ba483d1-894b-4156-856f-5ce1c7efad4d", 
     // web_id: "https://mornemaritz.solidcommunity.net/profile/card#me",
     // resource_uri: "https://mornemaritz.solidcommunity.net/private",
     redirect_uri: "http://localhost:1234/",
@@ -142,73 +143,73 @@ const client_config = {
     })
 
 
-    document.getElementById("discoverResourceAuthServer").addEventListener("click", async e => {
-        e.preventDefault();
+    // document.getElementById("discoverResourceAuthServer").addEventListener("click", async e => {
+    //     e.preventDefault();
 
-        await fetch(config.resource_uri)
-        .then(async response => {
-            if (!response.ok) {
-                if(response.status == 401) {
-                    let rs_auth_server = parseWwwAuthenticateHeader(response.headers.get('www-authenticate'));
-                    console.log(rs_auth_server);
-                    localStorage.setItem('rs_auth_server', JSON.stringify(rs_auth_server));
+    //     await fetch(config.resource_uri)
+    //     .then(async response => {
+    //         if (!response.ok) {
+    //             if(response.status == 401) {
+    //                 let rs_auth_server = parseWwwAuthenticateHeader(response.headers.get('www-authenticate'));
+    //                 console.log(rs_auth_server);
+    //                 localStorage.setItem('rs_auth_server', JSON.stringify(rs_auth_server));
 
-                    document.getElementById("resource_auth_server").innerText = rs_auth_server.as_url;
-                    document.getElementById("resource_auth_server_div").classList = "";
-                }
-                else if(response.status < 500)
-                {
-                    const errorResponse = await response.json();
-                    throw errorResponse;
-                }
-            } 
-            return await response.json()
-        })
-        .catch(e => {
-            console.error(e);
+    //                 document.getElementById("resource_auth_server").innerText = rs_auth_server.as_url;
+    //                 document.getElementById("resource_auth_server_div").classList = "";
+    //             }
+    //             else if(response.status < 500)
+    //             {
+    //                 const errorResponse = await response.json();
+    //                 throw errorResponse;
+    //             }
+    //         } 
+    //         return await response.json()
+    //     })
+    //     .catch(e => {
+    //         console.error(e);
 
-            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
-            document.getElementById("error").classList = "";
+    //         document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+    //         document.getElementById("error").classList = "";
 
-        });
+    //     });
         
-    })
+    // })
 
-    document.getElementById('requestAuthServerConfig').addEventListener("click", async e => {
-        e.preventDefault();
+    // document.getElementById('requestAuthServerConfig').addEventListener("click", async e => {
+    //     e.preventDefault();
 
-        await requestAuthServerConfig(JSON.parse(localStorage.getItem('rs_auth_server')))    
-        .then(uma_config => {
-            document.getElementById("as_token_endpoint").innerText = uma_config.token_endpoint;
-            document.getElementById("as_token_endpoint_div").classList = "";
-        })
-        .catch(e => {
-            console.error(e);
+    //     await requestAuthServerConfig(JSON.parse(localStorage.getItem('rs_auth_server')))    
+    //     .then(uma_config => {
+    //         document.getElementById("as_token_endpoint").innerText = uma_config.token_endpoint;
+    //         document.getElementById("as_token_endpoint_div").classList = "";
+    //     })
+    //     .catch(e => {
+    //         console.error(e);
 
-            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
-            document.getElementById("error").classList = "";
-        });
-    })
+    //         document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+    //         document.getElementById("error").classList = "";
+    //     });
+    // })
 
-    document.getElementById('requestResourceAccessToken').addEventListener('click', async e => {
-        e.preventDefault();
+    // document.getElementById('requestResourceAccessToken').addEventListener('click', async e => {
+    //     e.preventDefault();
 
-        await requestResourceAccessToken(JSON.parse(localStorage.getItem("uma_config")), JSON.parse(localStorage.getItem('rs_auth_server')))
-        .then(responseJson => {
-            document.getElementById("resource_access_token").innerText = responseJson.access_token;
-            document.getElementById("resource_access_token_div").classList = "";
+    //     await requestResourceAccessToken(JSON.parse(localStorage.getItem("uma_config")), JSON.parse(localStorage.getItem('rs_auth_server')))
+    //     .then(responseJson => {
+    //         document.getElementById("resource_access_token").innerText = responseJson.access_token;
+    //         document.getElementById("resource_access_token_div").classList = "";
 
-            // Replace the history entry to remove the auth code from the browser address bar
-            window.history.replaceState({}, null, "/");
-        })
-        .catch(e => {
-            console.error(e);
+    //         // Replace the history entry to remove the auth code from the browser address bar
+    //         window.history.replaceState({}, null, "/");
+    //     })
+    //     .catch(e => {
+    //         console.error(e);
 
-            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
-            document.getElementById("error").classList = "";
+    //         document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+    //         document.getElementById("error").classList = "";
 
-        });
-    })
+    //     });
+    // })
 
     document.getElementById('viewResource').addEventListener('click', async e => {
         e.preventDefault();
@@ -245,8 +246,13 @@ const client_config = {
                 (err,quad,prefixes) => {
                     
                     if (quad) {
-                        console.log(quad.object.value);
-                        console.log(quad.predicate.value);
+                        console.log(`object: ${quad.object.value}`);
+                        console.log(`predicate: ${quad.predicate.value}`);
+                        console.log(`subject: ${quad.subject.value}`);
+                        if (quad.predicate.value == "http://xmlns.com/foaf/0.1/name") {
+                            document.getElementById("resource").innerText = quad.object.value;
+                            document.getElementById("resource_div").classList = "";
+                        }
                     } else if (err) {
                         console.error(err);
                     } else {
@@ -261,6 +267,53 @@ const client_config = {
             document.getElementById("error").classList = "";
 
         });
+
+    })
+
+    document.getElementById('putContainer').addEventListener('click', async e => {
+        e.preventDefault();
+
+        const target =`${config.root_container}/testput/`; 
+
+        let claims = {
+            "htu": target,
+            "htm": "PUT",
+            "jti": generateRandomString(),
+            "iat": Math.round(Date.now() / 1000)
+        }
+
+        await generateDpopHeader(claims)
+        .then(async resourceDPoPHeader => {
+            return await fetch(target, {
+                method: 'PUT',
+                headers : {
+                    'Authorization': `DPoP ${localStorage.getItem('user_access_token')}`,
+                    'DPoP': `${resourceDPoPHeader}`,
+                    'Accept': 'text/turtle',
+                    'Content-Type': 'text/turtle'
+                }
+            })
+        })
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            
+            document.getElementById("container").innerText = response.status;
+            document.getElementById("container_div").classList = "";
+        })
+        .catch(e => {
+            console.error(e);
+
+            document.getElementById("error_details").innerText = e.error+"\n\n"+e.error_description;
+            document.getElementById("error").classList = "";
+
+        });
+
 
     })
   /*
