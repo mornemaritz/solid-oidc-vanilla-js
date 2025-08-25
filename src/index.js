@@ -273,9 +273,9 @@ const client_config = {
     document.getElementById('putContainer').addEventListener('click', async e => {
         e.preventDefault();
 
-        const target =`${config.root_container}/testput/`; 
+        const target =`${config.root_container}/health/`; 
 
-        let claims = {
+        const claims = {
             "htu": target,
             "htm": "PUT",
             "jti": generateRandomString(),
@@ -313,14 +313,69 @@ const client_config = {
             document.getElementById("error").classList = "";
 
         });
+    })
 
+    document.getElementById('transferPatientResource').addEventListener('click', async e => {
+        e.preventDefault();
 
+        await fetch('http://fhirserver.hl7fundamentals.org/fhir/Patient/3', {
+            headers: {
+                'Accept': 'application/fhir+turtle'
+            }
+        })
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            return await response.text()
+        })
+        .then(async textResponse => {
+
+            const target =`${config.root_container}/health/patient.ttl`;
+
+            const claims = {
+                "htu": target,
+                "htm": "PUT",
+                "jti": generateRandomString(),
+                "iat": Math.round(Date.now() / 1000)
+            }
+
+            var patientPutDpopHeader = await generateDpopHeader(claims);
+
+            return await fetch(target, {
+                method: 'PUT',
+                headers : {
+                    'Authorization': `DPoP ${localStorage.getItem('user_access_token')}`,
+                    'DPoP': `${patientPutDpopHeader}`,
+                    'Accept': 'text/turtle',
+                    'Content-Type': 'text/turtle'
+                },
+                body: textResponse 
+            })
+        })
+        .then(async response => {
+            if (!response.ok) {
+                if(response.status < 500)
+                {
+                    const errorResponse = await response.json();
+                    throw errorResponse;
+                }
+            } 
+            
+            document.getElementById("patient_transfer").innerText = response.status;
+            document.getElementById("patient_transfer_div").classList = "";
+        })
     })
   /*
 Based on https://solidproject.org/TR/oidc-primer
-Written using a Combination of 
-https://coolaj86.com/articles/sign-jwt-webcrypto-vanilla-js/
+Written using  
 https://github.com/aaronpk/pkce-vanilla-js/blob/master/index.html
+with a sprinkling of
+https://coolaj86.com/articles/sign-jwt-webcrypto-vanilla-js/
 */
 //////////////////////////////////////////////////////////////////////
 // OAUTH REQUEST
